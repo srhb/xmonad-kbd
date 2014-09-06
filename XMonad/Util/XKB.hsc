@@ -83,27 +83,29 @@ instance Storable XkbNamesRec where
     syms   <- (#peek XkbNamesRec, symbols) ptr
     return $ XkbNamesRec groups syms
 
-data Group = FirstGroup | SecondGroup | ThirdGroup | FourthGroup
-
-setKbdGroup group = withDisplay $ \dpy -> do
-  io $ xkbLockGroup dpy (#const XkbUseCoreKbd) $ case group of
-    FirstGroup  -> 0
-    SecondGroup -> 1
-    ThirdGroup  -> 2
-    FourthGroup -> 3
-  return ()
-
-getKbdGroups :: X [Maybe String]
-getKbdGroups = withDisplay $ \dpy -> do
-  xkbDescPtr <- io $ xkbGetKeyboard dpy 0x7f (#const XkbUseCoreKbd)
-  xkbDesc    <- io $ peek xkbDescPtr
-  xkbNames   <- io $ (peek . names) $ xkbDesc
+getKbdGroups :: Display -> IO [Maybe String]
+getKbdGroups dpy = do
+  xkbDescPtr <- xkbGetKeyboard dpy 0x7f (#const XkbUseCoreKbd)
+  xkbDesc    <- peek xkbDescPtr
+  xkbNames   <- (peek . names) $ xkbDesc
 
   let xkbGroups = groups xkbNames
 
-  io $ mapM (getAtomName dpy >=> return) . filter (/=0) $ xkbGroups
+  mapM (getAtomName dpy >=> return) . filter (/=0) $ xkbGroups
   
 getKbdGroup :: Display -> IO CUChar
 getKbdGroup d = alloca $ \stPtr -> do
   xkbGetState d (#const XkbUseCoreKbd) stPtr
   group <$> peek stPtr
+
+
+data Group = FirstGroup | SecondGroup | ThirdGroup | FourthGroup
+
+setKbdGroup :: Group -> Display -> IO Bool
+setKbdGroup group dpy =
+  xkbLockGroup dpy (#const XkbUseCoreKbd) $ case group of
+    FirstGroup  -> 0
+    SecondGroup -> 1
+    ThirdGroup  -> 2
+    FourthGroup -> 3
+
